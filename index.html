@@ -77,7 +77,11 @@
             <br>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
-        <div class="instructions">Use arrow keys to move</div>
+        <div class="instructions">
+            Use arrow keys to move
+            <br>
+            <button id="muteBtn" onclick="toggleMute()" style="margin-top: 10px; padding: 5px 10px; background: #333; color: white; border: 1px solid #666; border-radius: 3px; cursor: pointer;">🔊</button>
+        </div>
     </div>
 
     <script>
@@ -99,7 +103,7 @@
                 draw: function(x, y, isHead = false) {
                     ctx.fillStyle = isHead ? '#45a049' : '#4CAF50';
                     ctx.beginPath();
-                    ctx.arc(x * GRID_SIZE + GRID_SIZE/2, y * GRID_SIZE + GRID_SIZE/2, GRID_SIZE/2 - 2, 0, 2 * Math.PI);
+                    ctx.arc(x + GRID_SIZE/2, y + GRID_SIZE/2, GRID_SIZE/2 - 2, 0, 2 * Math.PI);
                     ctx.fill();
                 }
             },
@@ -107,8 +111,8 @@
                 name: "Star",
                 draw: function(x, y, isHead = false) {
                     ctx.fillStyle = isHead ? '#e6b800' : '#ffcc00';
-                    const centerX = x * GRID_SIZE + GRID_SIZE/2;
-                    const centerY = y * GRID_SIZE + GRID_SIZE/2;
+                    const centerX = x + GRID_SIZE/2;
+                    const centerY = y + GRID_SIZE/2;
                     const radius = GRID_SIZE/2 - 2;
                     drawStar(centerX, centerY, 5, radius, radius/2);
                 }
@@ -120,7 +124,7 @@
                     ctx.font = `${GRID_SIZE-4}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('🐛', x * GRID_SIZE + GRID_SIZE/2, y * GRID_SIZE + GRID_SIZE/2);
+                    ctx.fillText('🐛', x + GRID_SIZE/2, y + GRID_SIZE/2);
                 }
             }
         };
@@ -131,11 +135,61 @@
         let nextDirection = { x: 1, y: 0 };
         let currentCharacter = null;
 
+        // Animation state
+        let animationProgress = 0;
+        let lastUpdateTime = 0;
+        const GAME_SPEED = 150; // milliseconds per move
+        let previousSnake = [];
+
         // Snake (player character)
         let snake = [{ x: 10, y: 10 }];
 
         // Food
         let food = generateFood();
+        let foodAnimation = { scale: 1, targetScale: 1, shrinking: false };
+
+        // Audio setup
+        let audioContext = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playTone(frequency, duration, type = 'sine') {
+            if (isMuted || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.type = type;
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playEatSound() {
+            playTone(800, 0.1, 'square');
+        }
+
+        function playGameOverSound() {
+            playTone(150, 0.5, 'sawtooth');
+            setTimeout(() => playTone(100, 0.5, 'sawtooth'), 100);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+        }
 
         // Character selection
         function selectRandomCharacter() {
@@ -198,38 +252,84 @@
             // Clear canvas
             ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-            // Draw snake using current character
+            // Draw snake using current character with smooth animation
             if (currentCharacter) {
                 snake.forEach((segment, index) => {
                     const isHead = index === 0;
-                    currentCharacter.draw(segment.x, segment.y, isHead);
+                    let drawX = segment.x * GRID_SIZE;
+                    let drawY = segment.y * GRID_SIZE;
+                    
+                    // Apply smooth movement animation
+                    if (previousSnake[index] && animationProgress < 1) {
+                        const prevX = previousSnake[index].x * GRID_SIZE;
+                        const prevY = previousSnake[index].y * GRID_SIZE;
+                        drawX = prevX + (drawX - prevX) * animationProgress;
+                        drawY = prevY + (drawY - prevY) * animationProgress;
+                    }
+                    
+                    currentCharacter.draw(drawX, drawY, isHead);
                 });
             } else {
                 // Fallback to original squares if no character selected
-                snake.forEach(segment => {
-                    drawRect(segment.x, segment.y, '#4CAF50');
+                snake.forEach((segment, index) => {
+                    let drawX = segment.x;
+                    let drawY = segment.y;
+                    
+                    if (previousSnake[index] && animationProgress < 1) {
+                        const prevX = previousSnake[index].x;
+                        const prevY = previousSnake[index].y;
+                        drawX = prevX + (drawX - prevX) * animationProgress;
+                        drawY = prevY + (drawY - prevY) * animationProgress;
+                    }
+                    
+                    drawRect(drawX, drawY, '#4CAF50');
                 });
             }
 
-            // Draw food with improved appearance
+            // Draw food with animation
             drawFood(food.x, food.y);
         }
 
         function drawFood(x, y) {
-            // Draw a red apple-like food
+            // Update food animation
+            if (foodAnimation.shrinking) {
+                foodAnimation.scale = Math.max(0, foodAnimation.scale - 0.15);
+                if (foodAnimation.scale <= 0) {
+                    foodAnimation.shrinking = false;
+                    foodAnimation.scale = 1;
+                }
+            } else if (foodAnimation.scale < foodAnimation.targetScale) {
+                foodAnimation.scale = Math.min(foodAnimation.targetScale, foodAnimation.scale + 0.05);
+            }
+            
+            // Draw a red apple-like food with scale animation
+            const radius = (GRID_SIZE/2 - 3) * foodAnimation.scale;
             ctx.fillStyle = '#FF5722';
             ctx.beginPath();
-            ctx.arc(x * GRID_SIZE + GRID_SIZE/2, y * GRID_SIZE + GRID_SIZE/2, GRID_SIZE/2 - 3, 0, 2 * Math.PI);
+            ctx.arc(x * GRID_SIZE + GRID_SIZE/2, y * GRID_SIZE + GRID_SIZE/2, radius, 0, 2 * Math.PI);
             ctx.fill();
             
-            // Add a small green stem
-            ctx.fillStyle = '#4CAF50';
-            ctx.fillRect(x * GRID_SIZE + GRID_SIZE/2 - 1, y * GRID_SIZE + 2, 2, 4);
+            // Add a small green stem (only if not shrinking)
+            if (foodAnimation.scale > 0.3) {
+                ctx.fillStyle = '#4CAF50';
+                const stemWidth = 2 * foodAnimation.scale;
+                const stemHeight = 4 * foodAnimation.scale;
+                ctx.fillRect(x * GRID_SIZE + GRID_SIZE/2 - stemWidth/2, y * GRID_SIZE + 2, stemWidth, stemHeight);
+            }
         }
 
         // Game logic
-        function updateGame() {
+        function updateGame(currentTime) {
             if (!gameRunning) return;
+
+            // Check if it's time for a game update
+            if (currentTime - lastUpdateTime < GAME_SPEED) {
+                return;
+            }
+
+            // Store previous snake position for animation
+            previousSnake = snake.map(segment => ({ ...segment }));
+            animationProgress = 0;
 
             // Update direction
             direction = { ...nextDirection };
@@ -256,18 +356,27 @@
 
             // Check food collision
             if (head.x === food.x && head.y === food.y) {
+                // Trigger food eating animation
+                foodAnimation.shrinking = true;
+                playEatSound();
+                
                 // Grow snake (don't remove tail)
                 score += 10;
                 scoreElement.textContent = score;
                 food = generateFood();
+                foodAnimation.scale = 1;
+                foodAnimation.shrinking = false;
             } else {
                 // Remove tail (normal movement)
                 snake.pop();
             }
+
+            lastUpdateTime = currentTime;
         }
 
         function gameOver() {
             gameRunning = false;
+            playGameOverSound();
             gameOverElement.style.display = 'block';
         }
         
@@ -280,8 +389,12 @@
             nextDirection = { x: 1, y: 0 };
             snake = [{ x: 10, y: 10 }];
             food = generateFood();
+            animationProgress = 1;
+            previousSnake = [];
+            foodAnimation = { scale: 1, targetScale: 1, shrinking: false };
             selectRandomCharacter();
             drawGame();
+            startGameLoop();
         }
 
         // Input handling
@@ -305,19 +418,38 @@
         });
 
         // Game loop
-        function gameLoop() {
-            updateGame();
+        function gameLoop(currentTime) {
+            // Update animation progress
+            if (lastUpdateTime > 0 && currentTime - lastUpdateTime < GAME_SPEED) {
+                animationProgress = (currentTime - lastUpdateTime) / GAME_SPEED;
+            } else {
+                animationProgress = 1;
+            }
+
+            updateGame(currentTime);
             drawGame();
-            setTimeout(gameLoop, 150); // ~6.7 FPS for classic snake feel
+            
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startGameLoop() {
+            lastUpdateTime = performance.now();
+            requestAnimationFrame(gameLoop);
         }
 
         // Event listeners
         document.getElementById('restartBtn').addEventListener('click', restartGame);
         
+        // Initialize audio context on first user interaction
+        document.addEventListener('click', initAudio, { once: true });
+        document.addEventListener('keydown', initAudio, { once: true });
+        
         // Start the game
         selectRandomCharacter();
         drawGame();
-        gameLoop();
+        startGameLoop();
     </script>
 </body>
 </html>
