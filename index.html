@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game - Stage 1</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background-color: #000;
+        }
+        .score {
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .game-over {
+            color: #ff4444;
+            font-size: 32px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="score" id="score">Score: 0</div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div class="game-over" id="gameOver">Game Over!</div>
+    </div>
+    <script src="snake.js"></script>
+</body>
+</html>
