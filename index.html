@@ -65,6 +65,30 @@
         .restart-btn:hover {
             background-color: #45a049;
         }
+        
+        .high-scores {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            border: 2px solid #4CAF50;
+        }
+        
+        .high-scores h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        .high-scores ol {
+            text-align: left;
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .high-scores li {
+            margin: 5px 0;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -74,7 +98,13 @@
         <canvas id="gameCanvas" width="400" height="400"></canvas>
         <div id="gameOver" class="game-over" style="display: none;">
             Game Over!
-            <br>
+            <div>Your Score: <span id="finalScore">0</span></div>
+            <div id="highScoresDisplay" class="high-scores">
+                <h3>High Scores</h3>
+                <ol id="highScoresList">
+                    <li>No high scores yet!</li>
+                </ol>
+            </div>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
         <div class="instructions">
@@ -89,6 +119,10 @@
         const GRID_SIZE = 20;
         const CANVAS_SIZE = 400;
         const CELLS_PER_SIDE = CANVAS_SIZE / GRID_SIZE;
+        
+        // High scores configuration
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
 
         // Game elements
         const canvas = document.getElementById('gameCanvas');
@@ -189,6 +223,56 @@
         function toggleMute() {
             isMuted = !isMuted;
             document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+        }
+
+        // High scores functions
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                return JSON.parse(scoresJSON);
+            }
+            return [];
+        }
+
+        function saveHighScores(scores) {
+            localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+        }
+
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores.splice(MAX_HIGH_SCORES);
+
+            saveHighScores(highScores);
+            return true;
+        }
+
+        function isHighScore(score) {
+            const highScores = getHighScores();
+            if (highScores.length < MAX_HIGH_SCORES) {
+                return true;
+            }
+            return score > highScores[MAX_HIGH_SCORES - 1].score;
+        }
+
+        function displayHighScores() {
+            const highScores = getHighScores();
+            const highScoresList = document.getElementById('highScoresList');
+            
+            if (highScores.length === 0) {
+                highScoresList.innerHTML = '<li>No high scores yet!</li>';
+            } else {
+                highScoresList.innerHTML = highScores
+                    .map(entry => `<li>${entry.name} - ${entry.score} (${entry.date})</li>`)
+                    .join('');
+            }
         }
 
         // Character selection
@@ -377,6 +461,18 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
+            
+            // Update final score display
+            document.getElementById('finalScore').textContent = score;
+            
+            // Check if it's a high score and add it
+            if (isHighScore(score)) {
+                addHighScore(score);
+            }
+            
+            // Display updated high scores
+            displayHighScores();
+            
             gameOverElement.style.display = 'block';
         }
         
@@ -448,6 +544,7 @@
         
         // Start the game
         selectRandomCharacter();
+        displayHighScores(); // Initialize high scores display
         drawGame();
         startGameLoop();
     </script>
