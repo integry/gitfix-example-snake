@@ -74,6 +74,8 @@
         <canvas id="gameCanvas" width="400" height="400"></canvas>
         <div id="gameOver" class="game-over" style="display: none;">
             Game Over!
+            <div id="highScoreMessage" style="font-size: 24px; color: #4CAF50; margin: 10px 0;"></div>
+            <div id="highScoresDisplay" style="font-size: 16px; margin: 15px 0; text-align: left; display: inline-block;"></div>
             <br>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
@@ -135,6 +137,10 @@
         let nextDirection = { x: 1, y: 0 };
         let currentCharacter = null;
 
+        // High score constants
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
+
         // Animation state
         let animationProgress = 0;
         let lastUpdateTime = 0;
@@ -189,6 +195,82 @@
         function toggleMute() {
             isMuted = !isMuted;
             document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+        }
+
+        // High score functions
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                try {
+                    return JSON.parse(scoresJSON);
+                } catch (e) {
+                    console.error('Error parsing high scores:', e);
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        function saveHighScores(scores) {
+            try {
+                localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+            } catch (e) {
+                console.error('Error saving high scores:', e);
+            }
+        }
+
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores.splice(MAX_HIGH_SCORES);
+
+            saveHighScores(highScores);
+            return true;
+        }
+
+        function isNewHighScore(score) {
+            const highScores = getHighScores();
+            if (highScores.length < MAX_HIGH_SCORES) return true;
+            return score > highScores[MAX_HIGH_SCORES - 1].score;
+        }
+
+        function displayHighScores() {
+            const highScores = getHighScores();
+            const highScoresDisplay = document.getElementById('highScoresDisplay');
+            const highScoreMessage = document.getElementById('highScoreMessage');
+            
+            if (!highScoresDisplay) return;
+
+            if (isNewHighScore(score) && score > 0) {
+                addHighScore(score);
+                highScoreMessage.textContent = "🎉 New High Score! 🎉";
+                highScoreMessage.style.display = 'block';
+            } else {
+                highScoreMessage.style.display = 'none';
+            }
+
+            let html = '<div style="color: #4CAF50; font-weight: bold; margin-bottom: 10px;">High Scores:</div>';
+            
+            if (highScores.length === 0) {
+                html += '<div style="color: #ccc;">No high scores yet!</div>';
+            } else {
+                html += '<ol style="margin: 0; padding-left: 20px; color: #ccc;">';
+                highScores.forEach((entry, index) => {
+                    const isCurrentScore = entry.score === score && index === 0 && isNewHighScore(score);
+                    const style = isCurrentScore ? 'color: #4CAF50; font-weight: bold;' : 'color: #ccc;';
+                    html += `<li style="${style}">${entry.name} - ${entry.score} points</li>`;
+                });
+                html += '</ol>';
+            }
+            
+            highScoresDisplay.innerHTML = html;
         }
 
         // Character selection
@@ -377,6 +459,7 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
+            displayHighScores();
             gameOverElement.style.display = 'block';
         }
         
