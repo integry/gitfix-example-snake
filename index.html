@@ -65,6 +65,74 @@
         .restart-btn:hover {
             background-color: #45a049;
         }
+        
+        #gameOverScreen {
+            display: none;
+            background: rgba(0, 0, 0, 0.9);
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+            min-width: 300px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #finalScore {
+            font-size: 28px;
+            color: #4CAF50;
+            margin: 15px 0;
+        }
+        
+        #highScoresDisplay {
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        #highScoresDisplay h3 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+        
+        #highScoresDisplay ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        #highScoresDisplay li {
+            background: rgba(76, 175, 80, 0.1);
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        #highScoresDisplay li:first-child {
+            background: rgba(255, 215, 0, 0.1);
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        
+        .score-rank {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-right: 10px;
+        }
+        
+        .score-info {
+            flex: 1;
+        }
+        
+        .score-value {
+            font-weight: bold;
+            color: #ffcc00;
+        }
     </style>
 </head>
 <body>
@@ -72,9 +140,13 @@
         <div class="score">Score: <span id="score">0</span></div>
         <div id="currentCharacter" class="character-display">Playing as: Circle</div>
         <canvas id="gameCanvas" width="400" height="400"></canvas>
-        <div id="gameOver" class="game-over" style="display: none;">
-            Game Over!
-            <br>
+        <div id="gameOverScreen">
+            <h2 style="color: #ff4444; font-size: 48px; margin: 0;">Game Over!</h2>
+            <div id="finalScore">Your Score: <span class="score-value">0</span></div>
+            <div id="highScoresDisplay">
+                <h3>High Scores</h3>
+                <ol></ol>
+            </div>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
         <div class="instructions">
@@ -94,8 +166,76 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
-        const gameOverElement = document.getElementById('gameOver');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreElement = document.querySelector('#finalScore .score-value');
+        const highScoresDisplay = document.querySelector('#highScoresDisplay ol');
+        
+        // High score configuration
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
 
+        // High score functions
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                return JSON.parse(scoresJSON);
+            }
+            return [];
+        }
+        
+        function saveHighScores(scores) {
+            localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+        }
+        
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+            
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores.splice(MAX_HIGH_SCORES);
+            
+            saveHighScores(highScores);
+        }
+        
+        function isHighScore(score) {
+            const highScores = getHighScores();
+            if (highScores.length < MAX_HIGH_SCORES) {
+                return true;
+            }
+            return score > highScores[highScores.length - 1].score;
+        }
+        
+        function displayHighScores() {
+            const highScores = getHighScores();
+            highScoresDisplay.innerHTML = '';
+            
+            if (highScores.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'No high scores yet!';
+                li.style.textAlign = 'center';
+                highScoresDisplay.appendChild(li);
+            } else {
+                highScores.forEach((entry, index) => {
+                    const li = document.createElement('li');
+                    const rank = index + 1;
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏅';
+                    
+                    li.innerHTML = `
+                        <span class="score-rank">${medal} #${rank}</span>
+                        <span class="score-info">${entry.name}</span>
+                        <span class="score-value">${entry.score}</span>
+                    `;
+                    
+                    highScoresDisplay.appendChild(li);
+                });
+            }
+        }
+        
         // Character definitions
         const characters = {
             circle: {
@@ -377,14 +517,27 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
-            gameOverElement.style.display = 'block';
+            
+            // Update final score display
+            finalScoreElement.textContent = score;
+            
+            // Check and save high score
+            if (isHighScore(score)) {
+                addHighScore(score);
+            }
+            
+            // Display high scores
+            displayHighScores();
+            
+            // Show game over screen
+            gameOverScreen.style.display = 'block';
         }
         
         function restartGame() {
             gameRunning = true;
             score = 0;
             scoreElement.textContent = score;
-            gameOverElement.style.display = 'none';
+            gameOverScreen.style.display = 'none';
             direction = { x: 1, y: 0 };
             nextDirection = { x: 1, y: 0 };
             snake = [{ x: 10, y: 10 }];
