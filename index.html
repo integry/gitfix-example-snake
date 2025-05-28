@@ -75,6 +75,9 @@
         <div id="gameOver" class="game-over" style="display: none;">
             Game Over!
             <br>
+            <div style="font-size: 20px; margin: 10px 0;">Final Score: <span id="finalScore">0</span></div>
+            <div id="highScoresDisplay" style="font-size: 16px; margin: 20px 0; text-align: left; display: inline-block;"></div>
+            <br>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
         <div class="instructions">
@@ -151,6 +154,70 @@
         // Audio setup
         let audioContext = null;
         let isMuted = false;
+
+        // High Score System
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
+
+        // Function to load high scores from localStorage
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                return JSON.parse(scoresJSON);
+            }
+            return []; // Return empty array if no scores are stored
+        }
+
+        // Function to save high scores to localStorage
+        function saveHighScores(scores) {
+            localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+        }
+
+        // Function to add a new score to high scores
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score); // Sort descending by score
+            highScores.splice(MAX_HIGH_SCORES); // Keep only top N scores
+
+            saveHighScores(highScores);
+            return highScores;
+        }
+
+        // Function to check if a score qualifies as a high score
+        function isHighScore(score) {
+            const highScores = getHighScores();
+            return highScores.length < MAX_HIGH_SCORES || score > highScores[highScores.length - 1].score;
+        }
+
+        // Function to display high scores
+        function displayHighScores() {
+            const highScores = getHighScores();
+            const highScoresElement = document.getElementById('highScoresDisplay');
+            
+            if (!highScoresElement) return;
+            
+            let highScoreHtml = '<h3 style="color: #4CAF50; margin-bottom: 10px;">🏆 High Scores</h3>';
+            
+            if (highScores.length === 0) {
+                highScoreHtml += '<div style="color: #ccc;">No high scores yet!</div>';
+            } else {
+                highScoreHtml += '<ol style="margin: 0; padding-left: 20px; color: #fff;">';
+                highScores.forEach((entry, index) => {
+                    const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
+                    highScoreHtml += `<li style="margin: 5px 0;">${rankEmoji} ${entry.name} - <strong>${entry.score}</strong> <span style="color: #ccc; font-size: 12px;">(${entry.date})</span></li>`;
+                });
+                highScoreHtml += '</ol>';
+            }
+            
+            highScoresElement.innerHTML = highScoreHtml;
+        }
 
         function initAudio() {
             if (!audioContext) {
@@ -377,6 +444,21 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
+            
+            // Check if current score is a high score
+            if (isHighScore(score)) {
+                addHighScore(score);
+            }
+            
+            // Update final score display
+            const finalScoreElement = document.getElementById('finalScore');
+            if (finalScoreElement) {
+                finalScoreElement.textContent = score;
+            }
+            
+            // Display high scores
+            displayHighScores();
+            
             gameOverElement.style.display = 'block';
         }
         
@@ -446,10 +528,20 @@
         document.addEventListener('click', initAudio, { once: true });
         document.addEventListener('keydown', initAudio, { once: true });
         
+        // Initialize game
+        function initGame() {
+            // Initialize high scores storage if it doesn't exist
+            if (!localStorage.getItem(HIGH_SCORES_KEY)) {
+                saveHighScores([]);
+            }
+            
+            selectRandomCharacter();
+            drawGame();
+            startGameLoop();
+        }
+        
         // Start the game
-        selectRandomCharacter();
-        drawGame();
-        startGameLoop();
+        initGame();
     </script>
 </body>
 </html>
