@@ -65,6 +65,34 @@
         .restart-btn:hover {
             background-color: #45a049;
         }
+        
+        #highScoresDisplay {
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+        
+        #highScoresDisplay h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+        
+        #highScoresDisplay ol {
+            color: #fff;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        #highScoresDisplay li {
+            margin-bottom: 8px;
+        }
+        
+        #finalScoreDisplay {
+            color: #ffcc00;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +103,8 @@
         <div id="gameOver" class="game-over" style="display: none;">
             Game Over!
             <br>
+            <div id="finalScoreDisplay" style="font-size: 24px; margin: 10px 0;">Your Score: <span id="finalScore">0</span></div>
+            <div id="highScoresDisplay" style="margin: 20px 0; font-size: 18px;"></div>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
         <div class="instructions">
@@ -89,6 +119,8 @@
         const GRID_SIZE = 20;
         const CANVAS_SIZE = 400;
         const CELLS_PER_SIDE = CANVAS_SIZE / GRID_SIZE;
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
 
         // Game elements
         const canvas = document.getElementById('gameCanvas');
@@ -189,6 +221,58 @@
         function toggleMute() {
             isMuted = !isMuted;
             document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+        }
+
+        // High score management
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                return JSON.parse(scoresJSON);
+            }
+            return [];
+        }
+
+        function saveHighScores(scores) {
+            localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+        }
+
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score);
+            highScores.splice(MAX_HIGH_SCORES);
+
+            saveHighScores(highScores);
+        }
+
+        function isHighScore(score) {
+            const highScores = getHighScores();
+            if (highScores.length < MAX_HIGH_SCORES) return true;
+            return score > highScores[highScores.length - 1].score;
+        }
+
+        function displayHighScores() {
+            const highScores = getHighScores();
+            const highScoresDisplay = document.getElementById('highScoresDisplay');
+            
+            let highScoreHtml = "<h3 style='margin: 10px 0;'>High Scores</h3><ol style='text-align: left; display: inline-block; margin: 0; padding-left: 20px;'>";
+            
+            if (highScores.length === 0) {
+                highScoreHtml += "<li style='list-style: none; padding-left: 0;'>No high scores yet!</li>";
+            } else {
+                highScores.forEach(entry => {
+                    highScoreHtml += `<li style='margin: 5px 0;'>${entry.name} - ${entry.score} <span style='font-size: 14px; color: #888;'>(${entry.date})</span></li>`;
+                });
+            }
+            highScoreHtml += "</ol>";
+            
+            highScoresDisplay.innerHTML = highScoreHtml;
         }
 
         // Character selection
@@ -377,6 +461,24 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
+            
+            // Update final score display
+            document.getElementById('finalScore').textContent = score;
+            
+            // Check and add high score
+            if (score > 0 && isHighScore(score)) {
+                addHighScore(score);
+                // Add visual indicator for new high score
+                document.getElementById('finalScoreDisplay').innerHTML = 
+                    `Your Score: <span id="finalScore">${score}</span> <span style="color: #4CAF50; font-size: 20px;">⭐ NEW HIGH SCORE! ⭐</span>`;
+            } else {
+                document.getElementById('finalScoreDisplay').innerHTML = 
+                    `Your Score: <span id="finalScore">${score}</span>`;
+            }
+            
+            // Display high scores
+            displayHighScores();
+            
             gameOverElement.style.display = 'block';
         }
         
