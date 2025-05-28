@@ -75,6 +75,12 @@
         <div id="gameOver" class="game-over" style="display: none;">
             Game Over!
             <br>
+            <div style="margin: 20px 0; font-size: 18px;">
+                Your Score: <span id="finalScore">0</span>
+            </div>
+            <div id="highScoresDisplay" style="font-size: 14px; margin: 15px 0; text-align: left; display: inline-block;">
+                <!-- High scores will be displayed here -->
+            </div>
             <button id="restartBtn" class="restart-btn">Play Again</button>
         </div>
         <div class="instructions">
@@ -89,6 +95,10 @@
         const GRID_SIZE = 20;
         const CANVAS_SIZE = 400;
         const CELLS_PER_SIDE = CANVAS_SIZE / GRID_SIZE;
+
+        // High score configuration
+        const MAX_HIGH_SCORES = 5;
+        const HIGH_SCORES_KEY = 'snakeHighScores';
 
         // Game elements
         const canvas = document.getElementById('gameCanvas');
@@ -189,6 +199,62 @@
         function toggleMute() {
             isMuted = !isMuted;
             document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+        }
+
+        // High score management functions
+        function getHighScores() {
+            const scoresJSON = localStorage.getItem(HIGH_SCORES_KEY);
+            if (scoresJSON) {
+                return JSON.parse(scoresJSON);
+            }
+            return []; // Return empty array if no scores are stored
+        }
+
+        function saveHighScores(scores) {
+            localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
+        }
+
+        function addHighScore(newScore, playerName = "Player") {
+            const highScores = getHighScores();
+            const scoreEntry = { 
+                name: playerName, 
+                score: newScore, 
+                date: new Date().toLocaleDateString() 
+            };
+
+            highScores.push(scoreEntry);
+            highScores.sort((a, b) => b.score - a.score); // Sort descending by score
+            highScores.splice(MAX_HIGH_SCORES); // Keep only top N scores
+
+            saveHighScores(highScores);
+            return true; // Indicates a high score was added
+        }
+
+        function isHighScore(score) {
+            const highScores = getHighScores();
+            return highScores.length < MAX_HIGH_SCORES || score > highScores[highScores.length - 1].score;
+        }
+
+        function displayHighScores() {
+            const highScores = getHighScores();
+            const highScoresDisplay = document.getElementById('highScoresDisplay');
+            
+            if (!highScoresDisplay) return;
+
+            let highScoreHtml = "<h3 style='margin: 10px 0; color: #4CAF50;'>🏆 High Scores 🏆</h3>";
+            
+            if (highScores.length === 0) {
+                highScoreHtml += "<div style='color: #ccc;'>No high scores yet!</div>";
+            } else {
+                highScoreHtml += "<ol style='margin: 0; padding-left: 20px; color: #fff;'>";
+                highScores.forEach((entry, index) => {
+                    const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
+                    highScoreHtml += `<li style='margin: 5px 0;'>${medal} ${entry.name} - ${entry.score} pts (${entry.date})</li>`;
+                });
+                highScoreHtml += "</ol>";
+            }
+
+            highScoresDisplay.innerHTML = highScoreHtml;
         }
 
         // Character selection
@@ -377,6 +443,23 @@
         function gameOver() {
             gameRunning = false;
             playGameOverSound();
+            
+            // Update final score display
+            const finalScoreElement = document.getElementById('finalScore');
+            if (finalScoreElement) {
+                finalScoreElement.textContent = score;
+            }
+            
+            // Check and handle high scores
+            if (isHighScore(score)) {
+                // For now, just add with default name "Player"
+                // In a more advanced version, you could prompt for a name
+                addHighScore(score, "Player");
+            }
+            
+            // Display high scores
+            displayHighScores();
+            
             gameOverElement.style.display = 'block';
         }
         
